@@ -1,0 +1,13 @@
+function f = batch_wld(dirpath,filelist,nchannels)
+
+f = [];
+
+for i=1:length(filelist)
+    I = imread(fullfile(dirpath,filelist{i}));
+    if ndims(I) ~= nchannels && nchannels == 3
+        erro '3-channel image is required!';
+        return;
+    end
+    
+    
+end

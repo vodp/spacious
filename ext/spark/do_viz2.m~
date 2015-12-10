@@ -1,0 +1,48 @@
+clear all;
+clc;
+% dat_path = '/asti/data/vo/mlis/src/expt-satellite-viz/dat/raw/';
+dat_path = '/data/vo/mlis/dat/images_cnes/';
+
+ndaona_home = '/data/vo/mlis/ext/ndaona/ndaona/';
+drtoolbox_home = '/data/vo/mlis/ext/drtoolbox/';
+
+path ( path, genpath ( ndaona_home ) );
+path ( path, genpath ( drtoolbox_home ) );
+
+% read a satellite image
+img_code = '000000128955';
+I = imread ([dat_path img_code '_01_P001_MUL.tif']);
+
+%%  Patch Extraction
+disp('feature extraction...');
+szBlock = [64 64];    % the block size
+thumbnails = extract_patches(I,szBlock);
+
+%% FEATURE EXTRACTION
+disp ('dimensionality reduction...');
+method = 'KernelPCA';   % Laplacian Eigenmaps
+intrinsic_dim = 6;      % reduce the dimensionality into 3
+nNeighbors = 7;         
+
+%%
+opts.filename='ville-rouge';                    % image name's header
+opts.width = szBlock ( 1 );             % define the dimension for thumbnail
+opts.height = szBlock ( 2 );
+opts.chanel = 3;
+images = makepixRGB ( thumbnails, opts );  % create images to disk
+
+%%  Data Visualization
+disp ('data visualization...');
+imglabel = img_code;
+
+%%
+features = {'histogram','flusser','haralick','fmellin','hog'};
+for i=1:length(features)
+    load(img_code,features{i});
+    prewhiten(
+    Y = compute_mapping (zscore(eval(features{i})), method, intrinsic_dim, 'gauss','JDQR');
+    vis_label = ['satimg_' opts.filename '_' method '_d' num2str(intrinsic_dim) ...
+        '_nn' num2str(nNeighbors) '_patch' num2str(szBlock(1)) '_' features{i}];
+    ndaona ( 'POS', Y, 'PUBLISH', vis_label, 'PICS', images, 'PICDIR',['images_' opts.filename]);
+end
+%%

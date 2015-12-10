@@ -1,0 +1,824 @@
+/*
+ * Customizations for Partiview in applying to visualize satellite images
+ * Phong VO, vo@telecom-paristech.fr; Hichem Sahbi, sahbi@enst.fr
+ * Traitement au Signal et des Images,
+ * TELECOM ParisTech 2011.
+ * This file is part of SPACIOUS,  distribtion prohibited without authors' permission.
+ */
+/*
+ * spacious.cc
+ *
+ *  Created on: May 18, 2011
+ *      Author: phong
+ */
+#include <stdio.h>
+#include <stdlib.h>
+
+#ifdef _WIN32
+#include "winjunk.h"
+#endif
+
+#ifdef __APPLE__
+#include <OpenGL/gl.h>
+#else
+#include <GL/gl.h>    /* for GLuint */
+#endif
+
+#include "geometry.h"
+#include "shmem.h"
+#include <string.h>
+#include <stdarg.h>
+#include <math.h>
+#include <errno.h>
+#include <signal.h>
+
+#include "specks.h"
+#include "partiview.H"
+#include "partiviewc.h"
+
+#ifndef FLHACK
+# include <FL/glut.H>	/* for GLUT_STEREO if FLTK knows it */
+#endif
+
+#ifndef GLUT_STEREO
+# if unix
+#  include <FL/x.H>	/* otherwise, need GLX symbols for X-specific stereo */
+#  include <GL/glx.h>
+# endif
+#endif
+
+
+#include <ctype.h>
+#undef isspace		/* hack for irix 6.5 */
+#undef isdigit
+
+#ifdef FLHACK
+extern void _pview_pickmsg( const char *fmt, ... );
+#endif
+
+// Initialize bounds for graphical user controls. These bounds are computed
+// from points cloud.
+void spac_init_locators(void)
+{
+	  // Phong's code, update the UIs
+	  int nspecks = spac_get_bound(&(ppui.st->pboundmin_),&(ppui.st->pboundmax_));
+	  if (nspecks == -1)
+	  {
+		  Point p;
+		  p.x[0] = 0; p.x[1] = 0; p.x[2] = 0;
+		  ppui.st->pboundmin_ = p;
+		  ppui.st->pboundmax_ = p;
+		  fprintf(stderr,"No specks loaded");
+	  }
+	  else //update sliders
+	  {
+		  Point pmin = ppui.st->pboundmin_;
+		  Point pmax = ppui.st->pboundmax_;
+
+		  ppui.adjcoeff1->minimum(pmin.x[0]);
+		  ppui.adjcoeff1->maximum(pmax.x[0]);
+
+		  ppui.adjcoeff2->minimum(pmin.x[1]);
+		  ppui.adjcoeff2->maximum(pmax.x[1]);
+
+		  ppui.adjcoeff3->minimum(pmin.x[2]);
+		  ppui.adjcoeff3->maximum(pmax.x[2]);
+
+		  double step1 = (pmax.x[0] - pmin.x[0])/nspecks;
+		  double step2 = (pmax.x[1] - pmin.x[1])/nspecks;
+		  double step3 = (pmax.x[2] - pmin.x[2])/nspecks;
+		  ppui.adjcoeff1->step(step1);
+		  ppui.adjcoeff2->step(step2);
+		  ppui.adjcoeff3->step(step3);
+
+		  //printf ("%f %f %f\n",step1, step2, step3);
+	  }
+
+}
+
+// Get the bounds from loaded points cloud
+int spac_get_bound (Point* xmin, Point* xmax)
+{
+	register struct specklist *sl;
+	register struct speck *sp;
+	int minmaxk = MAXVAL+1, maxmaxk = 0;
+	int nspecks = 0;
+	struct stuff *st = ppui.st;
+
+	xmin->x[0] = xmin->x[1] = xmin->x[2] = 1e38;
+	xmax->x[0] = xmax->x[1] = xmax->x[2] = -1e38;
+	for(sl = st->sl; sl != NULL; sl = sl->next) {
+	    int i, maxk;
+	    if((sp = sl->specks) == NULL)
+	    	continue;
+/*
+	    for(maxk=0; maxk<MAXVAL && SMALLSPECKSIZE(maxk)<sl->bytesperspeck; maxk++)
+		;
+
+	    if(minmaxk > maxk) minmaxk = maxk;
+	    if(maxmaxk < maxk) maxmaxk = maxk;
+*/
+	    for(i = sl->nspecks; --i >= 0; sp = NextSpeck( sp, sl, 1 )) {
+			Point tp, *p = &sp->p;
+
+			if(xmin->x[0] > p->x[0]) xmin->x[0] = p->x[0];
+			if(xmax->x[0] < p->x[0]) xmax->x[0] = p->x[0];
+
+			if(xmin->x[1] > p->x[1]) xmin->x[1] = p->x[1];
+			if(xmax->x[1] < p->x[1]) xmax->x[1] = p->x[1];
+
+			if(xmin->x[2] > p->x[2]) xmin->x[2] = p->x[2];
+			if(xmax->x[2] < p->x[2]) xmax->x[2] = p->x[2];
+
+	    }
+	    nspecks += sl->nspecks;
+	}
+
+	if(nspecks == 0)
+		return -1;
+	else
+		return nspecks;
+}
+
+// Find the bounds for a subset of points cloud
+int spac_setbound(int* idx, int n)
+{
+	struct stuff* st = ppui.st;
+	struct specklist* sl;
+	int i,j,m = 0;
+	register struct speck* sp;
+	float specksize = 0;
+	Point pmin, pmax, pcen;
+	Point* pointset = NewN(Point,n);
+
+	for(sl = st->sl, j = 0; sl != NULL; sl = sl->next)
+	{
+		// nulldata
+		if((sp = sl->specks) == NULL)
+		   	continue;
+
+		// browse all specks
+		for(i = sl->nspecks; --i >= 0; sp = NextSpeck( sp, sl, 1 ))
+		{
+			// match specks against activated list
+			//printf("%d ",sp->val[1]);
+			int found = 0, k = 0;
+			while (!found && k < n)
+			{
+				if(int(sp->val[1]) == idx[k])
+				{
+					pointset[m++] = sp->p;
+					specksize = sp->size;
+					found = 1;
+				}
+				k++;
+			}
+		}
+		//break; //just one dataset :D
+	}
+
+	if (m == 0)
+	{
+		//printf ("\n not match\n");
+		return 0;
+	}
+//#ifdef DEBUG
+	//printf("selections: ");
+	//for (i = 0; i < n ; ++i)
+	//	printf("%d ",idx[i]);
+	//printf ("\n");
+//#endif
+	pmin = pmax = pointset[0];
+	// find the bounding box
+	for (i = 1 ; i < m ; ++i )
+	{
+		if (pmin.x[0] > pointset[i].x[0])
+			pmin.x[0] = pointset[i].x[0];
+		if (pmin.x[1] > pointset[i].x[1])
+			pmin.x[1] = pointset[i].x[1];
+		if (pmin.x[2] > pointset[i].x[2])
+			pmin.x[2] = pointset[i].x[2];
+
+		if (pmax.x[0] < pointset[i].x[0])
+			pmax.x[0] = pointset[i].x[0];
+		if (pmax.x[1] < pointset[i].x[1])
+			pmax.x[1] = pointset[i].x[1];
+		if (pmax.x[2] < pointset[i].x[2])
+			pmax.x[2] = pointset[i].x[2];
+	}
+
+	//
+	pcen.x[0] = (pmin.x[0] + pmax.x[0])/2;
+	pcen.x[1] = (pmin.x[1] + pmax.x[1])/2;
+	pcen.x[2] = (pmin.x[2] + pmax.x[2])/2;
+
+	float dx,dy,dz;
+	dx = (pmax.x[0] - pmin.x[0])/2;
+	dy = (pmax.x[1] - pmin.x[1])/2;
+	dz = (pmax.x[2] - pmin.x[2])/2;
+
+	pmin = ppui.st->pboundmin_;
+	pmax = ppui.st->pboundmax_;
+
+	float Dx = (pmax.x[0] - pmin.x[0])/2;
+	float Dy = (pmax.x[1] - pmin.x[1])/2;
+	float Dz = (pmax.x[2] - pmin.x[2])/2;
+
+	float coef = dx/Dx;
+	if (dy/Dy > coef)
+		coef = dy/Dy;
+	if (dz/Dz > coef)
+		coef = dz/Dz;
+
+	dx = Dx*coef; dy = Dy*coef; dz = Dz*coef;
+
+	// in case dx,dy,dz == 0?
+	if (dx == 0)
+		dx = specksize;
+	if (dy == 0)
+		dy = specksize;
+	if (dz == 0)
+		dz = specksize;
+
+	// update center of interest
+	specks_commandfmt(&ppui.st,"center %f %f %f",pcen.x[0],pcen.x[1],pcen.x[2]);
+
+	// adjust the box
+	specks_commandfmt(&ppui.st,"add box -n 1 -l 4 %f,%f,%f %f,%f,%f",pcen.x[0],pcen.x[1],pcen.x[2],dx,dy,dz);
+	specks_commandfmt(&ppui.st,"box on");
+
+	// adjust the clipping
+	if (ppui.clipbtn->value())
+		specks_commandfmt(&ppui.st,"cb %f,%f,%f %f,%f,%f",pcen.x[0],pcen.x[1],pcen.x[2],dx,dy,dz);
+
+	// update scaler
+	ppui.boxscale->value(coef);
+
+	// update sliders
+	ppui.adjcoeff1->value(pcen.x[0]);
+	ppui.adjcoeff2->value(pcen.x[0]);
+	ppui.adjcoeff3->value(pcen.x[0]);
+
+	// highlighting selected specks
+	if (ppui.highlightbtn->value())
+	{
+		specks_commandfmt(&ppui.st, "only= txnum %d",idx[0]);
+		for (i = 1; i < n ; ++i)
+			specks_commandfmt(&ppui.st, "only+ txnum %d",idx[i]);
+	}
+
+	// activate subset of specks
+	spac_activate_grid(idx,n);
+
+	Free (pointset);
+}
+
+
+// Read an satellite image onto the right window
+int spac_imread(const char* filename)
+{
+	// if another image was used before, release it
+	if (ppui.img != 0)
+	{
+		ppui.imgdisp->value(0);
+		ppui.img->release();
+		ppui.img = 0;
+	}
+
+	// load image from disk
+	ppui.img = Fl_Shared_Image::get(filename);
+
+	if (!ppui.img)
+		return 0; // image not found
+
+	ppui.imgdisp->value(ppui.img);
+	Fl::check();
+
+	return 1;
+}
+
+// Set rectangular grid for satellite image
+int spac_grid(int x, int y)
+{
+	ppui.imgdisp->set_grid(x,y);
+	return 1;
+}
+
+// Show several cells on satellite image. These cells are
+// selected on the left window.
+int spac_activate_grid(int* blks,int n)
+{
+	ppui.imgdisp->activate_blocks(blks,n);
+
+	return 1;
+}
+
+// Selection tool for the right window. User can select a subset of activated cells
+// and see where they are in the left window.
+int spac_hitbox (Point cen, float xsize, float ysize, float zsize)
+{
+	// need to check the availability of data before access it
+
+	struct stuff* st = ppui.st;
+	struct specklist* sl;
+	int i,j;
+	register struct speck* sp;
+
+	int nspecks = 0;
+
+	// first, estimate the number of specks in all the data
+	for(sl = st->sl; sl != NULL; sl = sl->next)
+	{
+		if((sp = sl->specks) == NULL || sl->text != NULL)
+		   	continue;
+		nspecks += sl->nspecks;
+	}
+
+	if (nspecks <= 0)
+		return -1;
+
+	// allocate an array to store activated specks
+	// note that this array is not necessarily filled up
+	int* activated = NewN(int,nspecks);
+
+	for(sl = st->sl, j = 0; sl != NULL; sl = sl->next)
+	{
+		// nulldata
+		if((sp = sl->specks) == NULL || sl->text != NULL)
+		   	continue;
+
+		SelMask *sel = sl->sel;
+		SelOp seesel = st->seesel;
+		for(i = sl->nspecks; --i >= 0; sp = NextSpeck( sp, sl, 1 )) {
+			if(!SELECTED(sl->sel[i], &seesel))
+				continue;
+			if(sp->p.x[0] < (cen.x[0] - xsize) ||
+			   sp->p.x[0] > (cen.x[0] + xsize) ||
+			   sp->p.x[1] < (cen.x[1] - ysize) ||
+			   sp->p.x[1] > (cen.x[1] + ysize) ||
+			   sp->p.x[2] < (cen.x[2] - zsize) ||
+			   sp->p.x[2] > (cen.x[2] + zsize)) {
+				continue;
+			}
+
+			// if the speck is within the box...
+			activated[j++] = sp->val[1]; // value index 1 means 'txnum'
+		}
+	}
+
+	// call the overlay drawer on the other display side
+	ppui.imgdisp->activate_blocks(activated,j);
+
+	// deallocate the memory
+	Free (activated);
+
+	return 1;
+}
+
+// Build minimum spanning tree
+int spac_build_minspantree (void)
+{
+	// construct a adjacency matrix for graph
+
+	// a trace array stores spanning tree is globally accessed and resided in each specklist
+	register struct specklist *sl;
+	register struct speck *spi, *spj, *spk;
+	int minmaxk = MAXVAL+1, maxmaxk = 0;
+	int nspecks = 0;
+	struct stuff *st = ppui.st;
+
+	// consider all specklist
+	for(sl = st->sl; sl != NULL; sl = sl->next) {
+	    int i, j, k, maxk;
+	    if((sl->specks) == NULL)
+	    	continue;
+
+	    if ( sl->have_tree == 1)
+	    	continue;
+
+	    // init a status array
+	    int* occupied = NewN(int,sl->nspecks);
+	    //reset them so that a graph nodes are free to be chosen
+	    for (i = 0 ; i < sl->nspecks ; ++i)
+	    	occupied[i] = 0;
+	    // randomly select a node to start
+	    occupied[0] = 1;
+
+	    // create a spanning tree for every specklist
+	    sl->spanningtree = NewN(int,sl->nspecks);
+	    for (i = 0 ; i < sl->nspecks ; ++i)
+	    	sl->spanningtree[i] = -1;
+	    //sl->spanningtree[0] = -1;
+
+	    sl->show = NewN(int,sl->nspecks);
+	    for (i = 0 ; i < sl->nspecks ; ++i)
+	    	sl->show[i] = 1;
+
+	    // collect a temporary array of point coordinates for direct access,
+	    // otherwise, we have to use sequential search of linked list
+	    Point* pts = NewN(Point,sl->nspecks);
+	    for (k = 0, spk = sl->specks; k < sl->nspecks ;  k++, spk = NextSpeck(spk, sl, 1))
+	    	pts[k] = spk->p;
+
+	    // check the number of nodes until the spanning tree covers the whole point cloud
+	    for (k = 0; k < sl->nspecks ; k++)
+	    {
+			// now, find the nearest node
+			int idx_src = -1, idx_dst = -1;
+			double value_min = 1e38;
+
+			// search for a source node from Closed Set...
+			for (i = 0 ; i < sl->nspecks ; i++)
+			{
+				// just consider occupied nodes
+				if (occupied[i] == 0)
+					continue;
+
+				//tmp_idx_src = i;
+				//tmp_src = pts[idx_src];
+
+				//...versus a sink node from Open Set
+				for(j = 0; j < sl->nspecks; ++j)
+				{
+					// do not consider occupied nodes
+					if (i == j || occupied[j] == 1)
+						continue;
+
+					double tmp = (pts[i].x[0] - pts[j].x[0])*(pts[i].x[0] - pts[j].x[0]) +
+								(pts[i].x[1] - pts[j].x[1])*(pts[i].x[1] - pts[j].x[1]) +
+								(pts[i].x[2] - pts[j].x[2])*(pts[i].x[2] - pts[j].x[2]);
+
+					// calculate the distance from the current point to the rest
+					if (tmp < value_min)
+					{
+						idx_dst = j;
+						idx_src = i;
+						value_min = tmp;
+					}
+				}
+			}
+
+			// now, we have selected the nearest node
+			sl->spanningtree[idx_dst] = idx_src;
+			occupied[idx_dst] = 1;
+	    }
+	    sl->have_tree = 1;
+	    specks_commandfmt(&ppui.st,"only= txnum 1-%d",sl->nspecks);
+	    Free (pts);
+	    //Free (occupied);
+	}
+
+
+	// process trace array to create edges
+	return spac_update_spantree();
+}
+
+// Collapse/Expand the tree by mouse. CTRL+MIDDLE-MOUSE
+// This functionality is not completed but can be used, anyway.
+int spac_navigate_nodes(int vertex)
+{
+	// just consider current specklist
+	struct stuff *st = ppui.st;
+	int i,j,k;
+	register struct specklist* sl;
+
+	for(sl = st->sl; sl != NULL; sl = sl->next) {
+
+		if((sl->specks) == NULL)//e only= command creates a subset of particles from the active data group based on the datavar data. The selection criteria can be made in several ways. By including the value ar
+			continue;
+
+		// if s spanning tree is not built
+		if (sl->spanningtree == NULL)
+			return -1;
+
+		// if clicking on a "hidden" node
+		if (sl->show[vertex] == 0)
+			return -1;
+
+		// build a visible degree array
+		int* degree = NewN(int,sl->nspecks);
+		for (i = 0 ; i < sl->nspecks ; ++i)
+		   	degree[i] = 0;
+		for (i = 0 ; i < sl->nspecks ; ++i)
+		{
+			for (j = 0 ; j < sl->nspecks ; ++j)
+			{
+				if (sl->spanningtree[i] == j || sl->spanningtree[j] == i) // if they are adjacent...
+					if (sl->show[i] + sl->show[j] == 2) // ...and one of two is hidden
+					{
+						degree[i] += 1;
+						degree[j] += 1;
+					}
+			}
+		}
+
+		int is_leaf = 0;
+		// valid iff vertex is a leaf node
+		if (degree[vertex] == 2)
+			is_leaf = 1;
+		/*
+		for (k = 0 ; k < sl->nspecks ; ++k )
+			if ((sl->spanningtree[k] == vertex || sl->spanningtree[vertex] == k) && sl->show[k] == 0)
+			{
+				// if there is a visible node linked to 'vertex'
+				// then 'vertex' must be an inner node since an inner
+				// node has all of its neighborhoods visible.
+				is_leaf = 1;
+				break;
+			}
+*/
+		if (is_leaf)
+		{
+			for (k = 0; k < sl->nspecks ; ++k)
+				if ((sl->spanningtree[k] == vertex || sl->spanningtree[vertex] == k) && sl->show[k] == 0)
+				{
+					sl->show[k] = 1;//expand nodes
+					// set visibility the corresponding vertex texture
+					specks_commandfmt(&ppui.st,"only+ txnum %d",k+1);
+				}
+		}
+		else
+		{
+			for (k = 0; k < sl->nspecks ; ++k)
+			{
+				if (sl->spanningtree[k] == vertex || sl->spanningtree[vertex] == k)
+				{
+					if (sl->show[k] == 1 && degree[k] == 2)
+					{
+						sl->show[k] = 0;// collapse nodes
+						specks_commandfmt(&ppui.st,"only- txnum %d",k+1);
+					}
+					else if (sl->show[k] == 0)
+					{
+						sl->show[k] = 1;// expand nodes
+						specks_commandfmt(&ppui.st,"only+ txnum %d",k+1);
+					}
+				}
+			}
+
+			//Free (degree);
+		}
+	}
+
+	return spac_update_spantree();
+}
+
+// Draw the spanning tree after any changes
+int spac_update_spantree (void)
+{
+	// check the availability of spanning tree
+	register struct specklist *sl;
+	register struct speck *sp;
+	struct stuff *st = ppui.st;
+	int i,j,k;
+	st->usemeshes = 1;
+
+	// consider all specklists
+	for(sl = st->sl; sl != NULL; sl = sl->next) {
+
+		if((sp = sl->specks) == NULL)
+		   	continue;
+
+		if ( sl->have_tree != 1)
+			continue;
+
+		// FIRST, delete old meshes
+		int timestep = st->datatime;
+		if (sl->have_mesh == 1)
+		{
+			if (st->meshes[st->curdata][timestep] != NULL)
+			{
+				struct mesh *m, *nm;
+				for(m = st->meshes[st->curdata][timestep], st->meshes[st->curdata][timestep] = NULL;
+						m; m = nm)
+				{
+					nm = m->next;
+					Free(m);
+					m = NULL;
+				}
+			}
+		}
+		sl->have_mesh = 1;
+		// SECOND, update meshes
+	    // collect a temporary array of point coordinates for direct access,
+	    // otherwise, we have to use sequential search of linked list
+	    Point* pts = NewN(Point,sl->nspecks);
+	    for (k = 0; k < sl->nspecks ;  k++, sp = NextSpeck(sp, sl, 1))
+	    	pts[k] = sp->p;
+
+	    // now find edges to order partiview draw meshes
+	    for (k = 0; k < sl->nspecks ; k++)
+	    {
+	    	if (sl->spanningtree[k] == -1 || sl->show[k] == 0)
+	    		continue;
+
+	    	Point source, sink;
+	    	source = pts[k];
+	    	sink = pts[sl->spanningtree[k]];
+	    	/*
+	    	char mesh_cmd[1000];
+	    	sprintf (mesh_cmd,"add mesh -c 0 -s wire -w 1 {\n1 2\n%f %f %f\n%f %f %f\n}",
+	    			source.x[0], source.x[1], source.x[2], sink.x[0], sink.x[1], sink.x[2]);
+	    	puts (mesh_cmd);
+	    	specks_commandfmt(&ppui.st,mesh_cmd);
+	    	*/
+	    	// add new mesh
+
+	    	struct mesh *m = NewN( struct mesh, 1 );
+	    	memset(m, 0, sizeof(*m));
+	    	m->type = QUADMESH;
+	    	m->txno = -1;
+	    	m->cindex = 3;
+	    	m->style = S_LINE;
+	    	m->linewidth = 1.5;
+	    	m->nu = 1;
+	    	m->nv = 2;
+	    	m->nverts = m->nv * m->nu;
+	    	m->pts = NewN( Point, m->nverts );
+	    	m->pts[0] = source;
+	    	m->pts[1] = sink;
+	    	m->tx = NULL;
+	    	m->next = st->meshes[st->curdata][timestep];
+	    	st->meshes[st->curdata][timestep] = m;
+	    }
+
+	    Free (pts);
+	}
+	return 1;
+}
+
+// Delete the drawing of spanning tree
+int spac_hide_spantree (void)
+{
+	// check the availability of spanning tree
+	register struct specklist *sl;
+	register struct speck *sp;
+	struct stuff *st = ppui.st;
+
+	// consider all specklists
+	for(sl = st->sl; sl != NULL; sl = sl->next) {
+
+		if((sp = sl->specks) == NULL)
+		   	continue;
+
+		if ( sl->have_tree != 1)
+			continue;
+
+		// FIRST, delete old meshes
+		int timestep = st->datatime;
+		if (sl->have_mesh == 1)
+		{
+			if (st->meshes[st->curdata][timestep] != NULL)
+			{
+				struct mesh *m, *nm;
+				for(m = st->meshes[st->curdata][timestep], st->meshes[st->curdata][timestep] = NULL;
+						m; m = nm)
+				{
+					nm = m->next;
+					Free(m);
+					m = NULL;
+				}
+			}
+		}
+	}
+}
+
+// batch expand the tree by showing hidden nodes if any
+int spac_expand_spantree (void)
+{
+	// check the existence of spanning tree
+	register struct specklist *sl;
+	register struct speck *sp;
+	struct stuff *st = ppui.st;
+
+	// consider all specklists
+	for(sl = st->sl; sl != NULL; sl = sl->next)
+	{
+		if ((sl->specks) == NULL)
+			continue;
+
+		if (sl->have_tree != 1)
+			continue;
+
+		// build a hidden degree array
+		int* tmp_show = NewN(int,sl->nspecks);
+		memcpy(tmp_show, sl->show, sizeof(int)*sl->nspecks);
+		for (int i = 0 ; i < sl->nspecks ; ++i)
+			for (int j = 0 ; j < sl->nspecks ; ++j)
+				if (sl->spanningtree[i] == j || sl->spanningtree[j] == i) // if they are adjacent...
+					if (sl->show[i] + sl->show[j] == 1) // ...and one of two is hidden
+					{
+						tmp_show[i] = 1;
+						tmp_show[j] = 1;
+						specks_commandfmt(&ppui.st,"only+ txnum %d", i+1);
+						specks_commandfmt(&ppui.st,"only+ txnum %d", j+1);
+					}
+
+		memcpy(sl->show,tmp_show,sizeof(int)*sl->nspecks);
+
+		Free (tmp_show);
+	}
+
+	return spac_update_spantree();
+}
+
+// collapse the tree by hiding one-degree nodes
+int spac_collapse_spantree (void)
+{
+	// check the existence of spanning tree
+	register struct specklist *sl;
+	register struct speck *sp;
+	struct stuff *st = ppui.st;
+	int i,j;
+	// consider all specklists
+	for(sl = st->sl; sl != NULL; sl = sl->next)
+	{
+		if (sl->specks == NULL)
+			continue;
+
+		if (sl->have_tree != 1)
+			continue;
+
+		// build a visible degree array
+		int* degree = NewN(int,sl->nspecks);
+		for (i = 0 ; i < sl->nspecks ; ++i)
+		   	degree[i] = 0;
+		for (i = 0 ; i < sl->nspecks ; ++i)
+		{
+			for (j = 0 ; j < sl->nspecks ; ++j)
+			{
+				if (sl->spanningtree[i] == j || sl->spanningtree[j] == i) // if they are adjacent...
+					if (sl->show[i] + sl->show[j] == 2) // ...and one of two is hidden
+					{
+						degree[i] += 1;
+						degree[j] += 1;
+					}
+			}
+		}
+
+		// build a hidden degree array
+		int* tmp_show = NewN(int,sl->nspecks);
+		memcpy(tmp_show, sl->show, sizeof(int)*sl->nspecks);
+		for (int i = 0 ; i < sl->nspecks ; ++i)
+			if (degree[i] == 2) // ...and one of two is hidden
+			{
+				tmp_show[i] = 0;
+				specks_commandfmt(&ppui.st,"only- txnum %d",i+1);
+			}
+
+		memcpy(sl->show,tmp_show,sizeof(int)*sl->nspecks);
+
+		Free (tmp_show);
+		Free (degree);
+	}
+
+	return spac_update_spantree();
+}
+
+// display the original spanning tree
+int spac_reset_spantree (void)
+{
+	// check the existence of spanning tree
+	register struct specklist *sl;
+	register struct speck *sp;
+	struct stuff *st = ppui.st;
+
+	// consider all specklists
+	for(sl = st->sl; sl != NULL; sl = sl->next)
+	{
+		if (sl->spanningtree == NULL)
+			continue;
+		memset(sl->show,1,sizeof(int)*sl->nspecks);
+	}
+
+	return spac_update_spantree();
+}
+
+// deallocate memory for spanning tree
+int spac_delete_spantree (void)
+{
+	// check the existence of spanning tree
+	register struct specklist *sl;
+	register struct speck *sp;
+	struct stuff *st = ppui.st;
+
+	// consider all specklists
+	for(sl = st->sl; sl != NULL; sl = sl->next)
+	{
+		if (sl->spanningtree == NULL)
+			continue;
+		Free (sl->spanningtree);
+		sl->spanningtree = NULL;
+
+		Free (sl->show);
+		sl->show = NULL;
+
+		struct mesh *m, *nm;
+		for(m = st->staticmeshes, st->staticmeshes = NULL; m; m = nm)
+		{
+		    nm = m->next;
+		    Free(m);
+		}
+	}
+}
+

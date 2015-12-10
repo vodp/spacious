@@ -1,0 +1,107 @@
+% dat_path = '/asti/data/vo/mlis/src/expt-satellite-viz/dat/raw/';
+%dat_path = '/tsi/linuxhome/aelghoul/Work/DataSets/images_cnes/Im1_000000128955_01_P001_MUL/';
+%proj_home = '/data/vo/mlis/src/expt-big/dat/src/';
+
+%ndaona_home = '/asti/data/vo/mlis/ext/ndaona/ndaona/';
+%drtoolbox_home = '/asti/data/vo/mlis/ext/drtoolbox/';
+
+%path ( path, genpath ( proj_home ) );
+%path ( path, genpath ( ndaona_home ) );
+%path ( path, genpath ( drtoolbox_home ) );
+
+% read a satellite image
+%I = imread ([dat_path '02APR01105228-M1BS-000000128955_01_P001.TIF']);
+
+
+
+featureList  = subdir(fullfile('/data/vo/mlis/dat/images_cnes/000000128955_01_P001_MUL/features', '*.txt'));
+imNumber = length(featureList);
+
+for i=1:imNumber
+    i
+    %fileName = [originaFeatureSpaceDir, '/', fileList{i}];   
+    
+    fid = fopen(featureList{i},'r');
+    
+    tmp = textscan(fid,'%s','delimiter',' ','endofline','\r\n');
+     %               temp = load(featureList{i}, '-ascii');
+    histo1 = textscan(fid,'histo1	%f',25,'delimiter','\n');
+    histo1 = textscan(fid,'histo1	%f',25,'delimiter','\n');
+    histo1 = textscan(fid,'histo1	%f',25,'delimiter','\n');
+    histo1 = textscan(fid,'histo1	%f',25,'delimiter','\n');
+    flusser = textscan(fid,'flusser	%f',11,'delimiter','\n');
+    harralick = textscan(fid,'haralick	%f',8,'delimiter','\n');
+    fmellin = textscan(fid,'fmellin	%f',16,'delimiter','\n');
+    hog = textscan(fid,'hog	%f',91,'delimiter','\n');
+    %descriptor = deal(temp(:));
+    
+    h = descriptor{1, 1};
+    
+    X(i, :) = k;
+
+   fclose(fid);
+end
+
+save Xfmellin X
+
+% % load Xfmellin
+% % 
+%%  Dimensionality Reduction
+% disp ('dimensionality reduction...');
+ method = 'LLE';   % Laplacian Eigenmaps
+ intrinsic_dim = 10;      % reduce the dimensionality into 3
+% % nNeighbors = 7;         
+ nNeighbors = 7;         
+ Yfull = compute_mapping (X, method, intrinsic_dim, nNeighbors);
+% %plot3(Y(:,1),Y(:,2),Y(:,3),'.');
+% 
+% Y = Yfull(:, 1:3);
+
+save Yfull_LLE_fmellin Yfull
+
+
+
+%%  Data Visualization
+
+
+
+blockList  = subdir(fullfile('/tsi/linuxhome/aelghoul/Work/Codes/spacious-0.1_demo/Features/features-2', '*.tif'));
+imNumber = length(blockList);
+
+for i=1:imNumber-1
+    i
+    
+    block = imread(blockList{i});
+    
+    thumbnails(i, :) = reshape(block, 1, []); 
+    
+    
+    
+end
+
+% load Yfull_LLE_fmellin
+% 
+% Y = Yfull(:, 1:3);
+% 
+% load thumbnails
+
+ szBlock = size(block);
+%szBlock = [64 64];
+
+disp ('data visualization...');
+opts.filename='bigsat';                    % image name's header
+opts.width = szBlock ( 1 );             % define the dimension for thumbnail
+opts.height = szBlock ( 2 );
+opts.chanel = 3;
+imglabel = 'big64';
+
+
+
+
+%load images
+
+images = makepixRGB ( double( thumbnails) , opts );  % create images to disk
+
+vis_label = ['satimg_' imglabel '_' method '_d' num2str(intrinsic_dim) '_nn' num2str(nNeighbors) '_patch' num2str(szBlock(1))];   % define the name for the visualization
+ndaona ( 'POS', Y, 'PUBLISH', vis_label, 'PICS', images, 'PICDIR',['images_' opts.filename], 'ATTRIBUTES', Yfull);
+%ndaona ( 'POS', Y, 'PUBLISH', vis_label, 'ATTRIBUTES', Yfull);

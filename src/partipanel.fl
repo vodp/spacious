@@ -1,0 +1,485 @@
+# data file for the Fltk User Interface Designer (fluid)
+version 1.0110 
+header_name {partipanel.H} 
+code_name {partipanel.cc}
+decl {\#include "partiview.H"} {} 
+
+Function {make_window()} {open
+} {
+  Fl_Window {ppui.mainwin} {open
+    xywh {1021 146 535 635} type Double box DOWN_BOX labelcolor 32 resizable
+    code0 {o->size_range(101,130);} visible
+  } {
+    Fl_Pack {} {open
+      xywh {0 0 535 635} resizable
+      code0 {o->spacing(0);}
+    } {
+      Fl_Group {ppui.toprow} {open
+        xywh {0 0 535 27}
+      } {
+        Fl_Menu_Button {ppui.more} {
+          label More open
+          xywh {1 1 49 25} box GTK_THIN_UP_BOX down_box GTK_THIN_DOWN_BOX color 0 selection_color 8 labelsize 11 labelcolor 3 align 20 deactivate
+        } {
+          MenuItem {ppui.inertiaon} {
+            label inertia
+            callback pp_inertia_on_cb
+            xywh {0 0 100 20} type Toggle labelsize 12 labelcolor 3
+            code0 {ppui.inertiaon = o;}
+          }
+          MenuItem {ppui.hrdiagon} {
+            label {H-R Diagram}
+            callback pp_hrdiag_on_cb
+            xywh {0 0 100 20} type Toggle labelcolor 3
+            code0 {ppui.hrdiagon = o;}
+          }
+        }
+        Fl_Group {ppui.objgroup} {open
+          xywh {160 0 375 27} color 48 selection_color 48 resizable
+        } {
+          Fl_Light_Button {ppui.label} {
+            user_data {&ppui.st} user_data_type {struct stuff **}
+            callback {specks_commandfmt(&ppui.st, "label %d", o->value());}
+            image {icon/text.gif} xywh {161 1 40 25} box GTK_THIN_UP_BOX down_box GTK_THIN_DOWN_BOX color 0 selection_color 2 labelfont 1 labelsize 12 labelcolor 3 when 1 deactivate
+          }
+          Fl_Button {ppui.homejump} {
+            user_data {&ppui.st} user_data_type {struct stuff **}
+            callback {char homestr[120];
+sprintf(homestr, "home %g %g %g  %g %g %g  (XYZ RxRyRz)", ppui.home[0], ppui.home[1], ppui.home[2], ppui.home[3], ppui.home[4], ppui.home[5]);
+specks_commandfmt( &ppui.st, homestr, o->value());}
+            image {icon/home.gif} xywh {201 1 40 25} box GTK_THIN_UP_BOX down_box GTK_THIN_DOWN_BOX color 0 selection_color 3 labelfont 1 labelsize 12 align 16
+          }
+          Fl_Group {ppui.slidergroup} {open
+            xywh {295 0 240 27} box FLAT_BOX when 1 resizable
+            code0 {//steven marx: version 0.7.02}
+          } {
+            Fl_Menu_Button {ppui.sldtype} {
+              label slum
+              callback pp_sldtype_cb open
+              tooltip {menu for choosing type of slider} xywh {298 1 40 25} box GTK_THIN_UP_BOX down_box GTK_THIN_DOWN_BOX color 0 selection_color 35 labelsize 11 labelcolor 3 align 20 textsize 12 textcolor 35
+            } {}
+            Fl_Value_Slider {ppui.slum} {
+              label {log slum}
+              user_data {&ppui.st} user_data_type {struct stuff **}
+              callback pp_slum_cb
+              xywh {375 2 160 10} type {Horz Fill} box GTK_THIN_DOWN_BOX color 48 selection_color 94 labelfont 1 labelsize 12 minimum -3 maximum 4.5 step 0.025 textsize 8 textcolor 3
+            }
+            Fl_Value_Slider {ppui.genericslider} {
+              label {generic slider}
+              callback pp_genericslider_cb
+              xywh {327 0 208 20} type {Horz Knob} color 35 selection_color 4 labelsize 12 labelcolor 3 when 3 minimum -3 maximum 4.5 step 0.025 textcolor 3 hide resizable
+            }
+            Fl_Button {ppui.linlog} {
+              label log
+              callback pp_linlog_cb
+              xywh {338 1 35 25} box GTK_THIN_UP_BOX down_box GTK_THIN_DOWN_BOX color 0 selection_color 3 labelsize 11 labelcolor 3 align 16
+              code0 {o->value(0); //initially slum slider is visible}
+              code1 {o->type(FL_TOGGLE_BUTTON);}
+            }
+          }
+        }
+        Fl_Menu_Button {ppui.obj} {
+          label {[gN]}
+          callback pp_obj_cb open
+          xywh {50 1 45 25} box GTK_THIN_UP_BOX down_box GTK_THIN_DOWN_BOX color 0 labelsize 11 labelcolor 3 align 20 textcolor 48 deactivate
+        } {}
+        Fl_Menu_Button {ppui.nav} {
+          user_data {&ppui.st} user_data_type {struct stuff **}
+          callback pp_nav_cb open
+          image {icon/compass.jpg} xywh {94 1 40 25} box GTK_THIN_UP_BOX down_box GTK_THIN_DOWN_BOX color 0 labelfont 1 labelsize 11 labelcolor 3 align 20 textsize 12
+        } {
+          MenuItem {} {
+            label {[f]ly}
+            image {icon/fly.png} xywh {0 0 30 20} labelfont 1 labelsize 11 labelcolor 3
+          }
+          MenuItem {} {
+            label {[o]rbit}
+            image {icon/orbit.png} xywh {0 0 30 20} labelfont 1 labelsize 11 labelcolor 3
+          }
+          MenuItem {} {
+            label {[r]ot}
+            image {icon/rot.png} xywh {0 0 30 20} labelfont 1 labelsize 11 labelcolor 3
+          }
+          MenuItem {} {
+            label {[t]ran}
+            image {icon/trans.gif} xywh {0 0 30 20} labelfont 1 labelsize 11 labelcolor 3
+          }
+        }
+      }
+      Fl_Scroll {} {open
+        xywh {1 26 534 33} type HORIZONTAL labelcolor 32 align 65 hide deactivate
+        class Fl_Scroll_Thin
+      } {
+        Fl_Pack {ppui.objtogs} {open
+          xywh {1 26 473 32} type HORIZONTAL color 96
+          code0 {o->spacing(2);}
+        } {
+          Fl_Button {} {
+            label g0
+            callback pp_objtog_cb
+            xywh {6 26 30 32} type Toggle box DOWN_BOX color 38 selection_color 0 labelsize 12 labelcolor 3
+          }
+        }
+      }
+      Fl_Tile {ppui.maintile} {open
+        xywh {0 60 535 575} color 139 labelsize 11 align 65 resizable
+      } {
+        Fl_Group {ppui.cmdhist} {
+          xywh {0 60 535 87} color 96
+          code0 {\#include "Hist.H"}
+          class Hist
+        } {
+          Fl_Browser {} {
+            xywh {1 60 534 62} type Hold box GTK_THIN_DOWN_BOX color 0 selection_color 1 labelsize 12 labelcolor 128 textsize 12 textcolor 3 resizable
+            code0 {o->scrollbar.align( FL_ALIGN_LEFT );}
+            code1 {o->scrollbar_width( 8 );}
+            code2 {o->hist(ppui.cmdhist);}
+            class HistBrowser
+          }
+          Fl_Group {} {open
+            xywh {0 120 535 27}
+          } {
+            Fl_Input {ppui.cmd} {
+              callback pp_cmd_cb
+              xywh {1 122 534 25} box GTK_THIN_DOWN_BOX color 38 selection_color 9 labelfont 1 labelsize 10 labelcolor 3 when 10 textcolor 55
+              code0 {o->cursor_color( o->textcolor() );}
+              code1 {o->hist( ppui.cmdhist );}
+              class HistInput
+            }
+          }
+        }
+        Fl_Tile {} {
+          callback {ppui.view->redraw();
+ppui.imgdisp->redraw();} open
+          xywh {1 147 534 488} box EMBOSSED_BOX resizable
+        } {
+          Fl_Group {ppui.view} {open
+            xywh {35 174 271 461} box DOWN_BOX
+            code0 {o->cursor(FL_CURSOR_CROSS);}
+            class Fl_Gview
+          } {}
+          Fl_Group {ppui.imgdisp} {
+            xywh {306 174 229 461} box DOWN_BOX
+            code0 {\#include "Fl_Image_Display.H"}
+            class Fl_Image_Display
+          } {}
+          Fl_Group {} {open
+            xywh {306 147 229 28} box FLAT_BOX
+          } {
+            Fl_Button {ppui.radiobtn_pan} {
+              callback {ppui.imgdisp->mode(FL_IMAGE_PAN);}
+              image {icon/pan.xpm} xywh {306 149 35 25} type Radio box GTK_THIN_UP_BOX down_box GTK_THIN_DOWN_BOX color 0 labelcolor 3
+            }
+            Fl_Button {ppui.radiobtn_zoomin} {
+              callback {ppui.imgdisp->mode(FL_IMAGE_ZOOM_IN);}
+              image {icon/zoom_in.xpm} xywh {341 149 35 25} type Radio box GTK_THIN_UP_BOX down_box GTK_THIN_DOWN_BOX color 0 labelcolor 3
+            }
+            Fl_Button {ppui.radiobtn_zoomout} {
+              callback {ppui.imgdisp->mode(FL_IMAGE_ZOOM_OUT);}
+              image {icon/zoom_out.xpm} xywh {376 149 35 25} type Radio box GTK_THIN_UP_BOX down_box GTK_THIN_DOWN_BOX color 0 labelcolor 3
+            }
+            Fl_Button {ppui.radiobtn_wand} {
+              callback {ppui.imgdisp->mode(FL_IMAGE_CLICK);}
+              image {icon/lasso.png} xywh {411 149 35 25} type Radio box GTK_THIN_UP_BOX down_box GTK_THIN_DOWN_BOX color 0 labelcolor 3
+            }
+            Fl_Group {} {open
+              xywh {490 149 45 25} resizable
+            } {}
+            Fl_Light_Button {} {
+              callback {if (o->value())
+{
+
+ppui.imgdisp->activate_location_window(1);
+
+}else
+
+ppui.imgdisp->activate_location_window(0);}
+              image {icon/map-icon.png} xywh {445 149 35 25} box GTK_THIN_UP_BOX down_box GTK_THIN_DOWN_BOX color 0
+            }
+          }
+          Fl_Group {ppui.adjustgrp} {open
+            xywh {1 147 34 488} box FLAT_BOX labelcolor 3
+          } {
+            Fl_Value_Slider {ppui.adjcoeff1} {
+              callback {double x = ppui.adjcoeff1->value();
+double y = ppui.adjcoeff2->value();
+double z = ppui.adjcoeff3->value();
+
+specks_commandfmt(&ppui.st,"center %f %f %f",x,y,z);
+
+Point pmin = ppui.st->pboundmin_;
+Point pmax = ppui.st->pboundmax_;
+float coef = ppui.boxscale->value();
+float dx = pmax.x[0] - pmin.x[0];
+float dy = pmax.x[1] - pmin.x[1];
+float dz = pmax.x[2] - pmin.x[2];
+float logscale = pow(10.,coef);
+dx = dx*logscale/2;
+dy = dy*logscale/2;
+dz = dz*logscale/2;
+Point pcen;
+parti_getcenter(&pcen);
+specks_commandfmt(&ppui.st,"add box -n 1 -l 4 %f,%f,%f %f,%f,%f",x,y,z,dx,dy,dz);
+specks_commandfmt(&ppui.st,"box on");
+if (ppui.clipbtn->value())
+specks_commandfmt(&ppui.st,"cb %f,%f,%f %f,%f,%f",x,y,z,dx,dy,dz);
+
+spac_hitbox(pcen,dx,dy,dz);}
+              xywh {3 207 10 428} type {Vert Fill} box GTK_THIN_DOWN_BOX selection_color 1 labelsize 10 labelcolor 3 align 1 step 0.005 textsize 1 textcolor 3
+            }
+            Fl_Value_Slider {ppui.adjcoeff2} {
+              callback {double x = ppui.adjcoeff1->value();
+double y = ppui.adjcoeff2->value();
+double z = ppui.adjcoeff3->value();
+
+specks_commandfmt(&ppui.st,"center %f %f %f",x,y,z);
+
+Point pmin = ppui.st->pboundmin_;
+Point pmax = ppui.st->pboundmax_;
+float coef = ppui.boxscale->value();
+float dx = pmax.x[0] - pmin.x[0];
+float dy = pmax.x[1] - pmin.x[1];
+float dz = pmax.x[2] - pmin.x[2];
+float logscale = pow(10.,coef);
+dx = dx*logscale/2;
+dy = dy*logscale/2;
+dz = dz*logscale/2;
+
+Point pcen;
+parti_getcenter(&pcen);
+
+specks_commandfmt(&ppui.st,"add box -n 1 -l 4 %f,%f,%f %f,%f,%f",pcen.x[0],pcen.x[1],pcen.x[2],dx,dy,dz);
+specks_commandfmt(&ppui.st,"box on");
+if (ppui.clipbtn->value())
+specks_commandfmt(&ppui.st,"cb %f,%f,%f %f,%f,%f",x,y,z,dx,dy,dz);
+
+spac_hitbox(pcen,dx,dy,dz);}
+              xywh {13 207 10 428} type {Vert Fill} box GTK_THIN_DOWN_BOX selection_color 2 labelsize 10 labelcolor 3 align 1 step 0.005 textsize 8 textcolor 3
+            }
+            Fl_Value_Slider {ppui.adjcoeff3} {
+              callback {double x = ppui.adjcoeff1->value();
+double y = ppui.adjcoeff2->value();
+double z = ppui.adjcoeff3->value();
+
+specks_commandfmt(&ppui.st,"center %f %f %f",x,y,z);
+
+Point pmin = ppui.st->pboundmin_;
+Point pmax = ppui.st->pboundmax_;
+float coef = ppui.boxscale->value();
+float dx = pmax.x[0] - pmin.x[0];
+float dy = pmax.x[1] - pmin.x[1];
+float dz = pmax.x[2] - pmin.x[2];
+float logscale = pow(10.,coef);
+dx = dx*logscale/2;
+dy = dy*logscale/2;
+dz = dz*logscale/2;
+
+Point pcen;
+parti_getcenter(&pcen);
+
+specks_commandfmt(&ppui.st,"add box -n 1 -l 4 %f,%f,%f %f,%f,%f",pcen.x[0],pcen.x[1],pcen.x[2],dx,dy,dz);
+specks_commandfmt(&ppui.st,"box on");
+if (ppui.clipbtn->value())
+specks_commandfmt(&ppui.st,"cb %f,%f,%f %f,%f,%f",x,y,z,dx,dy,dz);
+spac_hitbox(pcen,dx,dy,dz);}
+              xywh {23 207 10 428} type {Vert Fill} box GTK_THIN_DOWN_BOX selection_color 4 labelsize 11 labelcolor 3 align 1 step 0.005 textsize 8 textcolor 3
+            }
+            Fl_Choice {ppui.choice1} {
+              callback {spac_switch_dimensions(0,o->value());
+
+// recoloring
+char dimlabel[10];
+
+int choice = ppui.choice_color->value();
+int max_dim = ppui.st->sl->specks->dim;
+if (choice < max_dim)
+{
+	sprintf(dimlabel,"a%d",choice+1);
+	specks_commandfmt(&ppui.st,"color  %s",dimlabel);
+}else
+	specks_commandfmt(&ppui.st,"color onescol 1 1 1");} open
+              xywh {1 147 34 15} box GTK_THIN_UP_BOX down_box BORDER_BOX color 1 selection_color 7
+            } {}
+            Fl_Choice {ppui.choice2} {
+              callback {spac_switch_dimensions(1,o->value());
+
+// recoloring
+char dimlabel[10];
+
+int choice = ppui.choice_color->value();
+int max_dim = ppui.st->sl->specks->dim;
+if (choice < max_dim)
+{
+	sprintf(dimlabel,"a%d",choice+1);
+	specks_commandfmt(&ppui.st,"color  %s",dimlabel);
+}else
+	specks_commandfmt(&ppui.st,"color onescol 1 1 1");} open
+              xywh {1 162 34 15} box GTK_THIN_UP_BOX down_box BORDER_BOX color 2
+            } {}
+            Fl_Choice {ppui.choice3} {
+              callback {spac_switch_dimensions(2,o->value());
+
+// recoloring
+char dimlabel[10];
+
+int choice = ppui.choice_color->value();
+int max_dim = ppui.st->sl->specks->dim;
+if (choice < max_dim)
+{
+	sprintf(dimlabel,"a%d",choice+1);
+	specks_commandfmt(&ppui.st,"color  %s",dimlabel);
+}else
+	specks_commandfmt(&ppui.st,"color onescol 1 1 1");} open
+              xywh {1 177 34 15} box GTK_THIN_UP_BOX down_box BORDER_BOX color 4
+            } {}
+            Fl_Choice {ppui.choice_color} {
+              callback {char dimlabel[10];
+
+int choice = o->value();
+int max_dim = ppui.st->sl->specks->dim;
+if (choice < max_dim)
+{
+	sprintf(dimlabel,"a%d",choice+1);
+	specks_commandfmt(&ppui.st,"color  %s",dimlabel);
+}else
+	specks_commandfmt(&ppui.st,"color onescol 1 1 1");} open
+              xywh {1 192 34 15} box GTK_THIN_UP_BOX down_box BORDER_BOX color 48
+            } {}
+          }
+          Fl_Group {} {open
+            xywh {35 147 271 27} box FLAT_BOX labelfont 1 labelsize 11
+          } {
+            Fl_Light_Button {ppui.clipbtn} {user_data_type {void*}
+              callback {if (o->value())
+{
+Point pmin = ppui.st->pboundmin_;
+Point pmax = ppui.st->pboundmax_;
+float coef = ppui.boxscale->value();
+float dx = pmax.x[0] - pmin.x[0];
+float dy = pmax.x[1] - pmin.x[1];
+float dz = pmax.x[2] - pmin.x[2];
+float logscale = pow(10.,coef);
+dx = dx*logscale/2;
+dy = dy*logscale/2;
+dz = dz*logscale/2;
+Point pcen;
+parti_getcenter(&pcen);
+
+specks_commandfmt(&ppui.st,"clipbox %f,%f,%f %f,%f,%f",pcen.x[0],pcen.x[1],pcen.x[2],dx,dy,dz);
+specks_commandfmt(&ppui.st,"cb on");
+}else
+specks_commandfmt(&ppui.st,"cb off");}
+              image {icon/scissors.png} xywh {35 148 35 25} box GTK_THIN_UP_BOX color 0 labelsize 11 labelcolor 3
+            }
+            Fl_Slider {ppui.boxscale} {
+              label {focus range}
+              user_data {&ppui.st} user_data_type {struct stuff **}
+              callback {//specks_commandfmt(&ppui.st,"boxscale %f",o->value());
+Point pmin = ppui.st->pboundmin_;
+Point pmax = ppui.st->pboundmax_;
+float coef = ppui.boxscale->value();
+float dx = pmax.x[0] - pmin.x[0];
+float dy = pmax.x[1] - pmin.x[1];
+float dz = pmax.x[2] - pmin.x[2];
+float logscale = pow(10.,coef);
+dx = dx*logscale/2;
+dy = dy*logscale/2;
+dz = dz*logscale/2;
+
+Point pcen;
+parti_getcenter(&pcen);
+
+specks_commandfmt(&ppui.st,"add box -n 1 -l 4 %f,%f,%f %f,%f,%f",pcen.x[0],pcen.x[1],pcen.x[2],dx,dy,dz);
+specks_commandfmt(&ppui.st,"box on");
+if (ppui.clipbtn->value())
+specks_commandfmt(&ppui.st,"cb %f,%f,%f %f,%f,%f",pcen.x[0],pcen.x[1],pcen.x[2],dx,dy,dz);
+spac_hitbox(pcen,dx,dy,dz);} selected
+              xywh {255 151 51 10} type {Horz Fill} box GTK_THIN_DOWN_BOX selection_color 94 labelfont 1 labelsize 11 align 34 minimum -4 maximum 0 step 0.05 resizable
+              code0 {\#include <math.h>}
+            }
+            Fl_Button {ppui.focusbtn} {
+              callback {Point pmin = ppui.st->pboundmin_;
+Point pmax = ppui.st->pboundmax_;
+float coef = ppui.boxscale->value();
+float dx = pmax.x[0] - pmin.x[0];
+float dy = pmax.x[1] - pmin.x[1];
+float dz = pmax.x[2] - pmin.x[2];
+dx = dx*coef/2;
+dy = dy*coef/2;
+dz = dz*coef/2;
+
+Point pcen;
+parti_getcenter(&pcen);
+
+specks_commandfmt(&ppui.st,"add box -n 1 -l 4 %f,%f,%f %f,%f,%f",pcen.x[0],pcen.x[1],pcen.x[2],dx,dy,dz);
+specks_commandfmt(&ppui.st,"box on");
+specks_commandfmt(&ppui.st,"boxaxes on");
+ppui.adjcoeff1->value(pcen.x[0]);
+ppui.adjcoeff2->value(pcen.x[1]);
+ppui.adjcoeff3->value(pcen.x[2]);
+
+spac_hitbox(pcen,dx,dy,dz);
+//specks_commandfmt(&ppui.st,"jump %f %f %f",pcen.x[0],pcen.x[1],pcen.x[2]);}
+              image {icon/cube.jpg} xywh {105 148 35 25} box GTK_THIN_UP_BOX color 0 selection_color 3 labelsize 11 labelcolor 3
+            }
+            Fl_Light_Button {ppui.highlightbtn} {
+              callback {struct stuff* st = ppui.st;
+struct specklist* sl;
+
+if (!o->value())	
+{
+	for(sl = st->sl; sl != NULL; sl = sl->next)
+	{
+		// nulldata
+		if(sl->specks == NULL)
+			continue;
+		specks_commandfmt(&ppui.st,"only= patchid 1-100000");
+	}
+}else
+{
+
+}}
+              image {icon/filter.gif} xywh {70 148 35 25} box GTK_THIN_UP_BOX color 0 labelsize 11 labelcolor 3
+            }
+            Fl_Light_Button {ppui.graphbtn} {
+              callback {if (o->value())
+	spac_build_minspantree();
+else
+	spac_hide_spantree();
+	
+ppui.view->redraw();}
+              image {icon/tree.png} xywh {140 148 35 25} box GTK_THIN_UP_BOX color 0 labelsize 11 labelcolor 3
+            }
+            Fl_Menu_Button {} {open
+              xywh {175 148 35 25} box GTK_THIN_UP_BOX color 32 selection_color 48
+            } {
+              MenuItem {} {
+                label collapse
+                callback {spac_collapse_spantree ();
+ppui.view->redraw();}
+                xywh {0 0 30 20} labelfont 1 labelsize 11 labelcolor 3
+              }
+              MenuItem {} {
+                label expand
+                callback {spac_expand_spantree();
+ppui.view->redraw();}
+                xywh {0 0 30 20} labelfont 1 labelsize 11 labelcolor 3
+                code0 {\#include "partiviewc.h"}
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  Fl_Window {ppui.hrdiagwin} {open
+    xywh {997 519 280 230} type Double resizable
+    code0 {o->hide();} visible
+  } {
+    Fl_Group {ppui.hrdiag} {
+      xywh {0 0 284 234} box DOWN_BOX color 0 resizable
+      code0 {o->cursor(FL_CURSOR_CROSS);}
+      class Fl_Plot
+    } {}
+  }
+} 

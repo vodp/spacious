@@ -1,0 +1,26 @@
+function gen_speckfile (filepath,filename,Xnd,texturelist)
+
+fid = fopen(fullfile(filepath,filename),'wt');
+for i=1:size(Xnd,2)
+    fprintf(fid,'datavar %d a%d\n',i-1,i);
+end
+
+fprintf(fid,'datavar %d onescol\n',i);
+fprintf(fid,'datavar %d txnum\n',i+1);
+fprintf(fid,'datavar %d size\n',i);
+fprintf(fid,'texturevar txnum\n');
+
+if nargin == 4
+    for i=1:size(Xnd,2)
+        fprintf(fid,'texture -MO %d %s.sgi\n',i,texturelist{i});
+    end
+elseif nargin == 3
+    for i=1:size(Xnd,2)
+        fprintf(fid,'texture -MO %d bigsat%d.sgi\n',i,i);
+    end    
+end
+
+for i=1:size(Xnd,2)
+    fprintf(fid,'%f %f %f ',Xnd(i,1),Xnd(i,2),Xnd(i,3));
+    
+end
